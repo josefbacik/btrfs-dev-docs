@@ -25,14 +25,27 @@ GC tree we will drop the extent references for that bytenr.
 
 The `btrfs_header` will now include a `snapshot_id`, which will be taken from
 the owning root.  Additionally, the `btrfs_file_extent_item` will also grow a
-`snapshot_id`.  On every snapshot, the `snapshot_id` will be incremented.  This
-will allow us to easily determine the possible references of each block and file
-extent.
+`snapshot_id`.
+
+The `snapshot_id` will be taken from the owning root's `snapshot_id` that will
+be added to the `btrfs_root_item`.  It will start at 0 and be incremented at
+every snapshot of that root.  When a new tree block is created, it's
+`generation` will be the `transaction->transid` and it's `snapshot_id` will be
+`btrfs_root_item_snapshot_id(&root->root_item)`.
 
 This also will allow us to implement transaction commit-less snapshotting.
 Because each block will be updated with their own `snapshot_id` we can easily
 track modifications within the same transaction to a root, and thus allow us to
 decouple the work of snapshot creation from the transaction commit.
+
+The `snapshot_id` will be placed in the `btrfs_snapshot_item`, as described
+below, when a snapshot is taken.  The target of the snapshot will have its
+`btrfs_root_item_snapshot_id(&root->root_item)` increased, thus causing all new
+blocks that are created after the snapshot to carry a brand new `snapshot_id`.
+
+The `snapshot_id` in the `btrfs_file_extent_item` will be used to calculate the
+potential owners of the file extent using the `btrfs_snapshot_item` as described
+below.
 
 ## Snapshot tree
 
